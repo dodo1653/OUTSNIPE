@@ -5,9 +5,10 @@ import { seatTx, tokensFor, TIPS, LAUNCH_TIP } from './seat.js'
 const $ = (id) => document.getElementById(id)
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 const Q = new URLSearchParams(location.search)
-const RELAY = Q.get('relay') || 'https://outsnipe-relay.vetted-relay.workers.dev'
-const get = (p, q = '') => fetch(Q.get('relay') ? `${RELAY}/v1/${p}?${q}` : `/api/r?path=${p}&${q}`, { cache: 'no-store' }).then((r) => r.json())
-const post = (p, b) => fetch(`${RELAY}/v1/${p}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }).then((r) => r.json())
+// everything goes through this site's proxy (/api/r); ?relay=<url> talks to a relay directly (local testing)
+const RELAY = Q.get('relay')
+const get = (p, q = '') => fetch(RELAY ? `${RELAY}/v1/${p}?${q}` : `/api/r?path=${p}&${q}`, { cache: 'no-store' }).then((r) => r.json())
+const post = (p, b) => fetch(RELAY ? `${RELAY}/v1/${p}` : `/api/r?path=${p}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }).then((r) => r.json())
 const rpc = async (method, params) => { const r = await post('rpc', { method, params }); if (r.error) throw new Error(r.error); return r.result }
 const ago = (t) => { const s = Math.max(0, (Date.now() - t) / 1000); return s < 60 ? Math.floor(s) + 's' : s < 3600 ? Math.floor(s / 60) + 'm' : Math.floor(s / 3600) + 'h' }
 let toastT; const toast = (m, bad) => { const t = $('toast'); t.textContent = m; t.className = 'toast on' + (bad ? ' bad' : ''); clearTimeout(toastT); toastT = setTimeout(() => (t.className = 'toast'), 5200) }
