@@ -21,7 +21,10 @@ function av(w) { let h = 0; for (const c of String(w)) h = (h * 31 + c.charCodeA
 let st = null, sol = 0
 const mcf = (mc) => { const v = sol ? mc * sol : mc; return (sol ? '$' : '') + fmt(v) + (sol ? '' : ' SOL') }
 async function pull() {
-  try { st = await get('launches'); sol = st.sol || sol; paint() } catch { $('liveDot').className = 'off'; $('liveTxt').textContent = 'reconnecting' }
+  try { const r = await get('launches'); if (!r || !r.boarding) throw new Error('relay'); st = r; sol = st.sol || sol; paint() } catch {
+    $('liveDot').className = 'off'; $('liveTxt').textContent = 'reconnecting'
+    if (!st) { const m = '<div class="empty">Connecting to the relay… the board shows here in a moment.</div>'; $('board').innerHTML = m; $('landList').innerHTML = m }
+  }
 }
 function seatsHtml(L) {
   const out = []
@@ -261,3 +264,6 @@ function draw(now) {
   requestAnimationFrame(draw)
 }
 requestAnimationFrame(draw)
+
+// the contract address: click to copy
+$('ca').onclick = () => navigator.clipboard?.writeText($('ca').dataset.ca).then(() => toast('$OUTSNIPE contract address copied'))
