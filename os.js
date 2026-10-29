@@ -47,7 +47,7 @@ function paint() {
     : '<div class="empty">Nothing boarding right now. Schedule a launch and its four seats open here.</div>'
   $('board').querySelectorAll('.seatb').forEach((b) => (b.onclick = () => openSeat(b.dataset.id)))
   $('landList').innerHTML = st.launched.length ? st.launched.map((r) => {
-    const tags = r.failed ? `<i class="drop">${esc(r.failed)}</i>` : [`<i>launch · block 0</i>`, ...(r.seats || []).map((s) => s.dropped ? `<i class="drop">${esc(s.wallet)} dropped</i>` : s.block0 ? `<i>${esc(s.wallet)} · block 0</i>` : `<i class="late">${esc(s.wallet)} · +${s.slot && r.slot ? s.slot - r.slot : '?'} slot</i>`)].join('')
+    const tags = r.failed ? `<i class="drop">${esc(r.failed)}</i>` : [`<i>launch · block 0</i>`, ...(r.seats || []).map((s) => s.dropped ? `<i class="drop">${esc(s.wallet)} dropped</i>` : s.block0 ? `<i>${esc(s.wallet)} · block 0</i>` : `<i class="late">${esc(s.wallet)} · ${s.slot && r.slot ? '+' + (s.slot - r.slot) + ' slot' : 'sent after'}</i>`)].join('')
     return `<a class="rw" href="${r.failed ? '#' : 'https://pump.fun/coin/' + esc(r.mint)}" target="_blank" rel="noopener"><span class="t">${hhmm(r.at)}</span>${r.image ? `<img src="${esc(r.image)}" alt="">` : '<span class="ph"></span>'}
       <div><span class="tk">$${esc(r.symbol)}</span> <span class="nm">${esc(r.name)}</span><div class="ds">${r.failed ? 'did not launch' : r.bundled ? 'one bundle: launch + ' + (r.seats || []).filter((s) => s.block0).length + ' seats' : 'launched alone, seats right after'}</div></div>
       <div class="blk blkc">${tags}</div><span class="mono up">${r.live ? mcf(r.live.mc) : '—'}</span><span class="mono dim hm">${r.live ? (r.live.done ? 'graduated' : 'curve ' + r.live.prog + '%') : ''}</span></a>`
