@@ -1,0 +1,155 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>OUTSNIPE film</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Geist:wght@500;600&family=Geist+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #040605; } canvas { position: absolute; inset: 0; }</style>
+</head><body><canvas id="c" width="1920" height="1080"></canvas>
+<script>window.READY = false; window.DURATION = 10</script>
+<script type="module">
+// OUTSNIPE, 10 s. Every frame drawn by renderFrame(t). The reticle is the Blender render (brand/reticle.py, turn mode).
+const c = document.getElementById('c'), g = c.getContext('2d')
+const W = 1920, H = 1080, GREEN = '#21e46b', G2 = '#8cf5b4', RED = '#ff5a4e', INK = '#eef4f0', GREY = '#56635c'
+const seg = (t, a, b) => Math.max(0, Math.min(1, (t - a) / (b - a)))
+const eo = (x) => 1 - Math.pow(1 - x, 3), back = (x) => { const s = 1.6; x = Math.max(0, Math.min(1, x)); return 1 + (s + 1) * Math.pow(x - 1, 3) + s * Math.pow(x - 1, 2) }
+let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+const turn = await Promise.all(Array.from({ length: 72 }, (_, i) => new Promise((ok) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = `turn/r${String(i).padStart(3, '0')}.png` })))
+await Promise.all(['800 96px "Bricolage Grotesque"', '700 40px "Bricolage Grotesque"', '600 30px Geist', '500 22px Geist', '600 24px "Geist Mono"'].map((f) => document.fonts.load(f)))
+
+// the ground: near-black, a dotted grid, a green bloom
+const ground = document.createElement('canvas'); ground.width = W; ground.height = H
+{ const q = ground.getContext('2d'); q.fillStyle = '#040605'; q.fillRect(0, 0, W, H); q.fillStyle = 'rgba(255,255,255,.07)'; for (let y = 11; y < H; y += 26) for (let x = 11; x < W; x += 26) { q.beginPath(); q.arc(x, y, 1.1, 0, 7); q.fill() } }
+const grain = document.createElement('canvas'); grain.width = W / 2; grain.height = H / 2
+const gq = grain.getContext('2d'), gd = gq.createImageData(W / 2, H / 2)
+for (let i = 0; i < gd.data.length; i += 4) { const v = rnd() * 255; gd.data[i] = gd.data[i + 1] = gd.data[i + 2] = v; gd.data[i + 3] = 14 } gq.putImageData(gd, 0, 0)
+
+function bloom(x, y, r, a, col = '33,228,107') { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2) }
+function rr(x, y, w, h, r) { g.beginPath(); g.roundRect(x, y, w, h, r) }
+// words that blur in one after another
+function words(text, x, y, font, color, t0, t, { align = 'center', gap = 0.07, dur = 0.38, out = 99 } = {}) {
+  g.font = font; const ws = text.split(' '), sp = g.measureText(' ').width, wid = ws.map((w) => g.measureText(w).width)
+  const total = wid.reduce((a, b) => a + b, 0) + sp * (ws.length - 1)
+  let cx = align === 'center' ? x - total / 2 : x
+  const fo = seg(t, out, out + 0.25)
+  ws.forEach((w, i) => {
+    const p = seg(t, t0 + i * gap, t0 + i * gap + dur); if (p <= 0) { cx += wid[i] + sp; return }
+    g.save(); g.globalAlpha = eo(p) * (1 - fo); g.filter = `blur(${(1 - eo(p)) * 14 + fo * 10}px)`
+    g.fillStyle = color; g.textBaseline = 'alphabetic'; g.fillText(w, cx, y + (1 - eo(p)) * 18); g.restore(); cx += wid[i] + sp
+  })
+}
+function avatar(x, y, s, hue) { const gr = g.createLinearGradient(x, y, x + s, y + s); gr.addColorStop(0, `hsl(${hue} 70% 52%)`); gr.addColorStop(1, `hsl(${hue + 25} 60% 20%)`); g.fillStyle = gr; rr(x, y, s, s, s * 0.28); g.fill() }
+function pill(x, y, s) { g.save(); g.translate(x, y); g.rotate(-0.6); rr(-s / 2, -s / 5, s, s * 0.42, s * 0.21); g.save(); g.clip(); g.fillStyle = '#5be38f'; g.fillRect(-s / 2, -s, s / 2, s * 2); g.fillStyle = '#f4f1ea'; g.fillRect(0, -s, s / 2, s * 2); g.restore(); g.restore() }
+// a chip: avatar or icon, a bold line and a small line
+function chip(x, y, w, h, { title, small, kind = 'seat', hue = 140, alpha = 1, glow = 0 }) {
+  g.save(); g.globalAlpha = alpha
+  const red = kind === 'bot'
+  if (glow) { g.shadowColor = red ? 'rgba(255,90,78,.6)' : 'rgba(33,228,107,.6)'; g.shadowBlur = glow }
+  g.fillStyle = red ? '#170b0a' : kind === 'launch' ? '#0d1a13' : '#0a120e'; rr(x, y, w, h, 16); g.fill(); g.shadowBlur = 0
+  g.strokeStyle = red ? 'rgba(255,90,78,.55)' : kind === 'launch' ? 'rgba(33,228,107,.8)' : 'rgba(33,228,107,.45)'; g.lineWidth = 2; rr(x, y, w, h, 16); g.stroke()
+  const s = h - 24
+  if (kind === 'launch') { g.fillStyle = '#08100c'; rr(x + 12, y + 12, s, s, 12); g.fill(); pill(x + 12 + s / 2, y + 12 + s / 2, s * 0.7) }
+  else if (red) { g.fillStyle = '#2a110f'; rr(x + 12, y + 12, s, s, 12); g.fill(); g.strokeStyle = '#ff7a6e'; g.lineWidth = 2.4; const cx = x + 12 + s / 2, cy = y + 12 + s / 2; rr(cx - s * 0.3, cy - s * 0.18, s * 0.6, s * 0.46, 6); g.stroke(); g.beginPath(); g.moveTo(cx, cy - s * 0.18); g.lineTo(cx, cy - s * 0.34); g.stroke() }
+  else avatar(x + 12, y + 12, s, hue)
+  g.fillStyle = red ? '#ffb3ab' : INK; g.font = '600 26px Geist'; g.textBaseline = 'middle'; g.fillText(title, x + s + 28, y + h / 2 - 13)
+  g.fillStyle = red ? '#d77a70' : G2; g.font = '500 19px "Geist Mono"'; g.fillText(small, x + s + 28, y + h / 2 + 17)
+  g.restore()
+}
+function reticle(cx, cy, size, frame, alpha = 1) { const im = turn[Math.max(0, Math.min(71, Math.round(frame)))]; if (!im) return; g.save(); g.globalAlpha = alpha; g.drawImage(im, cx - size / 2, cy - size / 2, size, size); g.restore() }
+
+const BOTS = [['sniper bot', 'bought 2.10 SOL · block 0'], ['sniper bot', 'bought 1.40 SOL · block 0'], ['bundle wallet', 'bought 0.95 SOL · block 0'], ['sniper bot', 'bought 3.20 SOL · block 0'], ['copy bot', 'bought 0.60 SOL · block 1'], ['sniper bot', 'bought 1.75 SOL · block 1']]
+const SEATS = [['seat 1 · 0.50 SOL', 'block 0 · #2', 128], ['seat 2 · 0.25 SOL', 'block 0 · #3', 150], ['seat 3 · 1.00 SOL', 'block 0 · #4', 112], ['seat 4 · 0.10 SOL', 'block 0 · #5', 165]]
+
+window.renderFrame = (t) => {
+  g.setTransform(1, 0, 0, 1, 0, 0); g.filter = 'none'; g.globalAlpha = 1
+  g.drawImage(ground, 0, 0)
+
+  // ---- 1. the problem (0 .. 2.3): your coin, then the bots pile in ahead of everyone
+  if (t < 2.35) {
+    const out = seg(t, 2.1, 2.32)
+    bloom(960, 660, 520, 0.10 * (1 - out), '255,90,78')
+    words('Snipers buy your launch', 960, 250, '800 104px "Bricolage Grotesque"', INK, 0.12, t, { out: 2.1 })
+    words('before anyone else.', 960, 362, '800 104px "Bricolage Grotesque"', GREY, 0.42, t, { out: 2.1 })
+    const pc = back(seg(t, 0.35, 0.75)), shake = t > 0.8 && t < 2 ? Math.sin(t * 90) * 3 * seg(t, 0.8, 1.2) : 0
+    g.save(); g.globalAlpha = (1 - out); g.translate(960 + shake, 640); g.scale(0.6 + 0.4 * pc, 0.6 + 0.4 * pc); g.globalAlpha *= seg(t, 0.35, 0.5)
+    chip(-210, -58, 420, 116, { title: '$YOURCOIN', small: 'created on pump.fun', kind: 'launch', glow: 30 }); g.restore()
+    BOTS.forEach(([a, b], i) => {
+      const t0 = 0.8 + i * 0.16, p = back(seg(t, t0, t0 + 0.32)); if (p <= 0) return
+      const left = i % 2 === 0, row = Math.floor(i / 2), x = left ? 960 - 250 - 470 : 960 + 250, y = 520 + row * 128
+      g.save(); g.translate((left ? -1 : 1) * (1 - p) * 160, 0); chip(x, y, 470, 100, { title: a, small: b, kind: 'bot', alpha: seg(t, t0, t0 + 0.12) * (1 - out), glow: 18 }); g.restore()
+    })
+  }
+
+  // ---- 2. not anymore (2.3 .. 3.45)
+  if (t >= 2.3 && t < 3.5) {
+    const out = seg(t, 3.28, 3.48)
+    bloom(960, 520, 560, 0.2 * seg(t, 2.3, 2.7) * (1 - out))
+    reticle(960, 520, 760 + 160 * seg(t, 2.3, 3.5), 2 + 30 * seg(t, 2.3, 3.45), 0.42 * seg(t, 2.3, 2.6) * (1 - out))
+    words('Not anymore.', 960, 580, '800 150px "Bricolage Grotesque"', INK, 2.36, t, { gap: 0.12, out: 3.28 })
+  }
+
+  // ---- 3. the fix (3.45 .. 7.2): one bundle in block zero, the bots a block later, on a tilted board
+  if (t >= 3.45 && t < 7.25) {
+    const fin = seg(t, 3.45, 3.8), out = seg(t, 7.0, 7.22), drift = seg(t, 3.45, 7.2)
+    bloom(820, 520, 700, 0.12 * fin * (1 - out))
+    g.save(); g.globalAlpha = fin * (1 - out)
+    g.setTransform(0.9, -0.08 + 0.02 * drift, 0.28, 0.8, 250 - 50 * drift, 170 + 10 * drift)   // the grazing tilt, drifting slowly
+    const COL = 420, GAP = 40
+    ;['BLOCK 0', 'BLOCK 1', 'BLOCK 2'].forEach((lab, k) => {
+      const x = k * (COL + GAP), b0 = k === 0
+      g.fillStyle = b0 ? 'rgba(14,26,19,.92)' : 'rgba(12,14,13,.85)'; rr(x, 0, COL, 760, 26); g.fill()
+      g.strokeStyle = b0 ? 'rgba(33,228,107,.35)' : 'rgba(255,255,255,.08)'; g.lineWidth = 2; rr(x, 0, COL, 760, 26); g.stroke()
+      g.fillStyle = b0 ? GREEN : '#7c8982'; g.font = '600 24px "Geist Mono"'; g.textBaseline = 'middle'; g.fillText(lab, x + 28, 44)
+      g.fillStyle = '#56635c'; g.font = '500 18px "Geist Mono"'; g.fillText(b0 ? 'the coin is created here' : '+' + k * 0.4 + ' s', x + 28 + (b0 ? 140 : 140), 44)
+    })
+    // the bundle: launch, then four seats, dropping in order
+    const items = [['$YOURCOIN · launch', 'creator · #1', 0, 'launch'], ...SEATS.map((s) => [s[0], s[1], s[2], 'seat'])]
+    items.forEach(([a, b, hue, kind], i) => {
+      const t0 = 3.68 + i * 0.22, p = back(seg(t, t0, t0 + 0.36)); if (p <= 0) return
+      g.save(); g.translate(0, -(1 - p) * 220); chip(20, 92 + i * 128, COL - 40, 108, { title: a, small: b, kind, hue, alpha: seg(t, t0, t0 + 0.1), glow: kind === 'launch' ? 24 : 10 }); g.restore()
+    })
+    // the bundle bracket
+    const bp = seg(t, 4.95, 5.35)
+    if (bp > 0) {
+      g.save(); g.globalAlpha *= bp; g.shadowColor = 'rgba(33,228,107,.8)'; g.shadowBlur = 30; g.strokeStyle = GREEN; g.lineWidth = 3
+      rr(8, 80, COL - 16, 5 * 128 + 4, 20); g.stroke(); g.restore()
+      g.save(); g.globalAlpha *= bp; g.fillStyle = GREEN; rr(COL - 300, 694, 280, 44, 12); g.fill(); g.fillStyle = '#021108'; g.font = '600 19px "Geist Mono"'; g.textBaseline = 'middle'; g.fillText('one Jito bundle · all or nothing', COL - 286, 716); g.restore()
+    }
+    // the bots, late
+    ;[[1, 0, 'sniper bot', 'saw it in block 0'], [1, 1, 'sniper bot', 'saw it in block 0'], [2, 0, 'copy bot', 'saw it in block 1']].forEach(([k, r, a, b], i) => {
+      const t0 = 5.35 + i * 0.2, p = back(seg(t, t0, t0 + 0.36)); if (p <= 0) return
+      g.save(); g.translate(k * (COL + GAP), -(1 - p) * 220); chip(20, 92 + r * 128, COL - 40, 108, { title: a, small: b, kind: 'bot', alpha: seg(t, t0, t0 + 0.1) }); g.restore()
+    })
+    g.restore()
+    g.setTransform(1, 0, 0, 1, 0, 0)
+    // captions, bottom left, one after another
+    const cap = (txt, a, b, col = INK) => words(txt, 120, 940, '800 78px "Bricolage Grotesque"', col, a, t, { align: 'left', out: b })
+    cap('Your launch and four seats.', 3.55, 5.0)
+    cap('Same block. In that order.', 5.12, 6.1)
+    cap('Before any bot can see it.', 6.2, 7.0, GREEN)
+  }
+
+  // ---- 4. the rules (7.2 .. 8.55)
+  if (t >= 7.2 && t < 8.6) {
+    const out = seg(t, 8.35, 8.55)
+    bloom(960, 540, 600, 0.1 * (1 - out))
+    words('Pre-signed.', 960, 380, '800 112px "Bricolage Grotesque"', INK, 7.24, t, { out: 8.35 })
+    words('All or nothing.', 960, 530, '800 112px "Bricolage Grotesque"', INK, 7.5, t, { out: 8.35 })
+    words('No snipers ahead of you.', 960, 680, '800 112px "Bricolage Grotesque"', GREEN, 7.78, t, { gap: 0.05, out: 8.35 })
+  }
+
+  // ---- 5. the end card (8.5 .. 10)
+  if (t >= 8.5) {
+    const a = seg(t, 8.5, 8.8)
+    bloom(960, 360, 560, 0.22 * a)
+    reticle(960, 370, 520, 36 + 35 * eo(seg(t, 8.5, 9.6)), a)
+    words('OUTSNIPE', 960, 790, '800 150px "Bricolage Grotesque"', INK, 8.7, t, { gap: 0 })
+    words('the public launch bundle for pump.fun', 960, 862, '500 34px Geist', '#9aa79f', 8.95, t, { gap: 0.04 })
+    words('$OUTSNIPE', 960, 930, '600 30px "Geist Mono"', GREEN, 9.2, t)
+  }
+
+  // grain, vignette, the last fade
+  g.setTransform(1, 0, 0, 1, 0, 0); g.filter = 'none'; g.globalAlpha = 1
+  g.drawImage(grain, (Math.floor(t * 30) % 3) * -8, 0, W + 16, H)
+  const vg = g.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.95); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)'); g.fillStyle = vg; g.fillRect(0, 0, W, H)
+  const f = seg(t, 9.72, 10); if (f > 0) { g.fillStyle = `rgba(0,0,0,${f})`; g.fillRect(0, 0, W, H) }
+}
+window.renderFrame(0); window.READY = true
+</script></body></html>

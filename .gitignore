@@ -1,0 +1,12 @@
+relay/node_modules/
+relay/.wrangler/
+node_modules/
+promo/clock/
+promo/out/
+promo/frames120/
+promo/frames120.log
+promo/turn/
+promo/out/
+promo/frames120/
+promo/frames120.log
+brand/test_*.png
