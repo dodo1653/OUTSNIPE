@@ -55,7 +55,7 @@ function paint() {
   heroSeats()
 }
 setInterval(() => { document.querySelectorAll('.cd').forEach((e) => { const at = +e.dataset.at; e.textContent = left(at); e.classList.toggle('soon', at - Date.now() < 60_000) }) }, 500)
-pull(); setInterval(pull, 4000)
+pull(); setInterval(pull, 6000)
 
 // ---------------------------------------------------------------- wallet, nonce accounts
 const W3 = () => import('https://esm.sh/@solana/web3.js@1.98.0?bundle')

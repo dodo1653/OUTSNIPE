@@ -2,7 +2,7 @@
 // budget holds however many people are watching. Submitting, voting and uploads go to the relay directly.
 export const config = { runtime: 'edge' }
 const RELAY = 'https://outsnipe-relay.vetted-relay.workers.dev/v1/'
-const TTL = { launches: 2, board: 4, vamp: 2, coin: 4 }
+const TTL = { launches: 5, board: 8, vamp: 3, coin: 8 }
 export default async function handler(req) {
   const u = new URL(req.url), path = u.searchParams.get('path')
   if (!TTL[path]) return new Response('{"error":"unknown"}', { status: 404, headers: { 'content-type': 'application/json' } })

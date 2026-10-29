@@ -4,7 +4,7 @@
 import { DurableObject } from "cloudflare:workers"
 import { createRelay } from "./server.js"
 
-const IDLE_MS = 20 * 60_000, TICK_MS = 15_000   // the alarm counts against the free plan's 100k Durable Object requests a day (shared by every relay on the account)
+const IDLE_MS = 6 * 60_000, TICK_MS = 15_000   // the alarm counts against the free plan's 100k Durable Object requests a day (shared by every relay on the account)
 
 export default {
   async fetch(req, env) { return env.RELAY.get(env.RELAY.idFromName("outsnipe-1")).fetch(req) },
